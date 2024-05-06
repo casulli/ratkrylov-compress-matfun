@@ -12,7 +12,11 @@ This repository additonally contains the MATLAB code to reproduce the numerical 
 
 Some functions required to run the other low-memory methods that we compare against `RKcompress_fAb` are contained in the `utils-comparison` folder; the output of the experiments is saved in the `output-data` folder.
 
-[1] Angelo A. Casulli, Igor Simunec, A low-memory Lanczos method with rational Krylov compression for matrix functions, to appear on arXiv (2024).
+The folder `block-version` contains a variant of the code for the computation of f(A)B, where B is a block vector (i.e. a tall and skinny matrix) based on block Krylov subspaces. This code has been only used in [2].
+
+[1] Angelo A. Casulli, Igor Simunec, A low-memory Lanczos method with rational Krylov compression for matrix functions, arXiv:2403.04390 (2024).
+
+[2] Angelo A. Casulli, Block rational Krylov methods for matrix equations and matrix functions, PhD thesis, 2024
 
 ## Dependencies
 
