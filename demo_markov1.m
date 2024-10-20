@@ -55,6 +55,7 @@ for j = 1:length(nn0)
 
 	% Two-pass Lanczos:
 	fprintf("twopass lanczos\n");
+    options.checkconv = 1;
 	tic;
 	[y, iter(2,j)] = lanczos_fAb_twopass(A, b, infpoles, f, options.tol, options);
 	time(2,j) = toc;
@@ -129,6 +130,15 @@ for j = 1:length(nn0)
 	% time(7,j) = toc;
 	% err(7,j) = norm(y-FAb)/norm(FAb);
 
+    % Two-pass Lanczos20:
+	fprintf("twopass lanczos20\n");
+    options.checkconv = 20;
+	tic;
+	[y, iter(7,j)] = lanczos_fAb_twopass(A, b, infpoles, f, options.tol, options);
+	time(7,j) = toc;
+	err(7,j) = norm(y-FAb)/norm(FAb);
+
+
 	fprintf("\n");
 end
 
@@ -141,6 +151,7 @@ dlmwrite('output-data/invsqrt_multishiftCG-rem.dat',[nn0.', time(4,:).'],'\t');
 dlmwrite('output-data/invsqrt_restarted.dat',[nn0.', time(5,:).'],'\t');
 dlmwrite('output-data/invsqrt_restarted-defl.dat',[nn0.', time(6,:).'],'\t');
 % dlmwrite('output-data/invsqrt1_low-memory-aaa.dat',[nn0.', time(7,:).'],'\t');
+dlmwrite('output-data/invsqrt_lanczos-twopass20.dat',[nn0.', time(7,:).'],'\t');
 
 % table data
 for j = 1:length(nn0)

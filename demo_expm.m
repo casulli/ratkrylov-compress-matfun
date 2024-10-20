@@ -20,45 +20,48 @@ maxit = 2000;
 options.maxit = maxit;
 infpoles = inf*ones(1, maxit);
 
-time = zeros(4, length(tt));
-err = zeros(4, length(tt));
-iter = zeros(4, length(tt));
+time = zeros(6, length(tt)); 
+err = zeros(6, length(tt));
+iter = zeros(6, length(tt));
+
 
 for j = 1:length(tt)
-	t = tt(j);
-	fprintf("%.4e\n", t);
-	B = t*A;
+    t = tt(j);
+    fprintf("%.4e\n", t);
+    B = t*A;
 
-	% Exact solution:
-	C = -gallery("tridiag", n0);
-	C = C * ((n0+1)^2);
+    % Exact solution:
+    C = -gallery("tridiag", n0);
+    C = C * ((n0+1)^2);
     FC = expm(t*C)*ones(n0,1);
-	FAb = kron(FC, FC);
+    FAb = kron(FC, FC);
 
-	% RKcompress: 
-	fprintf("RKcompress\n");
-	tic;
-	[y, iter(1, j)] = RKcompress_fAb(B, b, "exp", inf, @expm,options.tol, options);
-	time(1, j) = toc;
-	err(1, j) = norm(y-FAb)/norm(FAb);
+    % RKcompress:
+    fprintf("RKcompress\n");
+    tic;
+    [y, iter(1, j),k,m] = RKcompress_fAb(B, b, "exp", inf, @expm,options.tol, options);
+    time(1, j) = toc;
+    err(1, j) = norm(y-FAb)/norm(FAb);
 
-	% Lanczos:
-	fprintf("lanczos\n");
-	tic; 
-	[y, iter(2, j)] = lanczos_fAb(B, b, infpoles, @expm, options.tol, options);
-	time(2, j) = toc;
-	err(2, j) = norm(y-FAb)/norm(FAb);
+    % Lanczos:
+    options.checkconv = 1;
+    fprintf("lanczos\n");
+    tic;
+    [y, iter(2, j)] = lanczos_fAb(B, b, infpoles, @expm, options.tol, options);
+    time(2, j) = toc;
+    err(2, j) = norm(y-FAb)/norm(FAb);
 
-	% Two-pass Lanczos:
-	fprintf("twopass lanczos\n");
-	options.fast2pass = true;
-	tic;
-	[y, iter(3, j)] = lanczos_fAb_twopass(B, b, infpoles, @expm, options.tol, options);
-	time(3, j) = toc;
-	err(3, j) = norm(y-FAb)/norm(FAb);
+    % Two-pass Lanczos:
+    fprintf("twopass lanczos\n");
+    options.checkconv = 1;
+    options.fast2pass = true;
+    tic;
+    [y, iter(3, j)] = lanczos_fAb_twopass(B, b, infpoles, @expm, options.tol, options);
+    time(3, j) = toc;
+    err(3, j) = norm(y-FAb)/norm(FAb);
 
-	% Full-orthogonalization Arnoldi:
-	if (j <= 3)
+    % Full-orthogonalization Arnoldi:
+    if (j <= 3)
 		fprintf("full arnoldi\n");
 		s = 1;
 		m = 1;
@@ -80,9 +83,27 @@ for j = 1:length(tt)
 		time(4, j) = toc;
 		iter(4, j) = s;
 		err(4, j) = norm(y-FAb)/norm(FAb);
-	end
-	fprintf("\n");
+    end
+    
+    % Lanczos20:
+    options.checkconv = 20;
+    fprintf("lanczos20\n");
+    tic;
+    [y, iter(5, j)] = lanczos_fAb(B, b, infpoles, @expm, options.tol, options);
+    time(5, j) = toc;
+    err(5, j) = norm(y-FAb)/norm(FAb);
 	
+    % Two-pass Lanczos20:
+    options.checkconv = 20;
+    fprintf("twopass lanczos20\n");
+    options.fast2pass = true;
+    tic;
+    [y, iter(6, j)] = lanczos_fAb_twopass(B, b, infpoles, @expm, options.tol, options);
+    time(6, j) = toc;
+    err(6, j) = norm(y-FAb)/norm(FAb);
+
+
+    fprintf("\n");
 end
 
 % check iter and error discrepancy among different methods
@@ -94,6 +115,8 @@ dlmwrite('output-data/exp_low-mem.dat',[tt.',time(1,:).'],'\t');
 dlmwrite('output-data/exp_Lanczos.dat',[tt.',time(2,:).'],'\t');
 dlmwrite('output-data/exp_Lanczos-twoPass.dat',[tt.',time(3,:).'],'\t');
 dlmwrite('output-data/exp_Arnoldi-full.dat',[tt(1:3).',time(4,1:3).'],'\t');
+dlmwrite('output-data/exp_Lanczos20.dat',[tt.',time(5,:).'],'\t');
+dlmwrite('output-data/exp_Lanczos-twoPass20.dat',[tt.',time(6,:).'],'\t');
 
 % table data
 iter_str = sprintf("iter & & %d & %d & %d & %d & %d \\\\", iter(2, :));

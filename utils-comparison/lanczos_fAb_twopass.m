@@ -12,7 +12,7 @@ function [y, iter, errhist] = lanczos_fAb_twopass(A, b, theta, f, tol, options)
 	% 	tol			relative stopping tolerance
 	%	options		struct with fields:
 	%		options.maxit			maximum number of iterations
-	%		options.solveSystems	cell array of function handles, such that solveSystems{i}(v) = (A - theta(i)*I)^(-1)*b 
+	%		options.solveSystems	cell array of function handles, such that solveSystems{i}(v) = (A - theta(i)*I)^(-1)*b
 	%				(can be populated automatically if A is a matrix; must be provided as input if A is a function handle)
 	%		options.fast2pass		boolean; if true, use fast second pass implementation that does not recompute orthogonalization coefficients (default = true)
 	%
@@ -35,6 +35,9 @@ function [y, iter, errhist] = lanczos_fAb_twopass(A, b, theta, f, tol, options)
 	if nargout == 3
 		errhist = [];
 	end
+	if isfield (options, 'checkconv') == 0
+		options.checkconv = 1;
+	end
 
 	% preprocessing: factorizations for solving linear systems
 	decomp = cell(1, k);
@@ -48,9 +51,9 @@ function [y, iter, errhist] = lanczos_fAb_twopass(A, b, theta, f, tol, options)
 					break;
 				end
 			end
-			if ~check 
+			if ~check
 				if theta(i) == inf
-						options.solveSystems{i} = @(v) v;
+					options.solveSystems{i} = @(v) v;
 				else
 					if isa(A, 'function_handle')
 						error("options.solveSystems must be given as input if A is a function handle");
@@ -69,7 +72,7 @@ function [y, iter, errhist] = lanczos_fAb_twopass(A, b, theta, f, tol, options)
 	else
 		mu = 0;
 	end
-	
+
 	% First pass:
 	W = zeros(n, 3);		% contains only last three columns of the Krylov basis
 	alpha = zeros(1, k+1);
@@ -81,7 +84,7 @@ function [y, iter, errhist] = lanczos_fAb_twopass(A, b, theta, f, tol, options)
 
 	for j = 1:k
 		if j == 1
-			nrmb = norm(b);	
+			nrmb = norm(b);
 			W(:, 2) = b/nrmb;
 			[W(:, 3), alpha(1), beta(1)] = short_recurrence_Arnoldi_in(mult, options.solveSystems{1}, zeros(n,1), W(:,2), theta(1), inf, inf, 0);
 		elseif j == 2
@@ -96,24 +99,30 @@ function [y, iter, errhist] = lanczos_fAb_twopass(A, b, theta, f, tol, options)
 			invpoles(j+1) = 1/theta(j);
 		end
 		% Compute solution and check convergence if last pole is infinity:
-		if theta(j) == inf
-			H = diag(alpha(1:j)) + diag(beta(1:j-1),-1) + diag(beta(1:j-1),-1)';
-			K = eye(j) + diag(invpoles(1:j)) * H;
-			T = H/K + mu*eye(j);
-			yhat = f(T)*[nrmb; zeros(j-1, 1)];
-			iter = j;
-			% Check convergence:
-			errest = norm(yhat - [yhat_old; zeros(j - j_old, 1)]);
-			if nargout == 3
-				errhist(end+1, :) = [j, errest/norm(yhat)];
-			end
-			if errest < tol*norm(yhat)
-				% Convergence reached: start second pass to compute solution
+		if mod(j,options.checkconv)==0
+			if theta(j) == inf
+				H = diag(alpha(1:j)) + diag(beta(1:j-1),-1) + diag(beta(1:j-1),-1)';
+				K = eye(j) + diag(invpoles(1:j)) * H;
+				T = H/K + mu*eye(j);
+				yhat = f(T)*[nrmb; zeros(j-1, 1)];
+				if options.checkconv > 1
+					yhat_old = f(T(1:end-1,1:end-1))*[nrmb; zeros(j-2, 1)];
+					j_old = j-1;
+				end
 				iter = j;
-				break;
-			else
-				yhat_old = yhat;
-				j_old = j;
+				% Check convergence:
+				errest = norm(yhat - [yhat_old; zeros(j - j_old, 1)]);
+				if nargout == 3
+					errhist(end+1, :) = [j, errest/norm(yhat)];
+				end
+				if errest < tol*norm(yhat)
+					% Convergence reached: start second pass to compute solution
+					iter = j;
+					break;
+				else
+					yhat_old = yhat;
+					j_old = j;
+				end
 			end
 		end
 		W(:, 1:2) = W(:, 2:3);		% discard old basis vector
@@ -137,7 +146,7 @@ function [y, iter, errhist] = lanczos_fAb_twopass(A, b, theta, f, tol, options)
 		for j = 1:iter-1
 			% Recompute basis:
 			if j == 1
-				nrmb = norm(b);	
+				nrmb = norm(b);
 				W(:, 2) = b/nrmb;
 				y = y + W(:, 2)*yhat(1);
 				[W(:, 3), alpha(1), beta(1)] = short_recurrence_Arnoldi_in(mult, options.solveSystems{1}, zeros(n,1), W(:,2), theta(1), inf, inf, 0);
@@ -148,7 +157,7 @@ function [y, iter, errhist] = lanczos_fAb_twopass(A, b, theta, f, tol, options)
 			end
 			y = y + W(:, 3)*yhat(j+1);	% update solution
 			W(:, 1:2) = W(:, 2:3);		% discard old basis vector
-		end	
+		end
 	end
 
-end 
+end

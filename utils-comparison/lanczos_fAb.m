@@ -12,8 +12,9 @@ function [y, iter, errhist] = lanczos_fAb(A, b, theta, f, tol, options)
 	% 	tol			relative stopping tolerance
 	%	options		struct with fields:
 	%		options.maxit			maximum number of iterations
-	%		options.solveSystems	cell array of function handles, such that solveSystems{i}(v) = (A - theta(i)*I)^(-1)*b 
+	%		options.solveSystems	cell array of function handles, such that solveSystems{i}(v) = (A - theta(i)*I)^(-1)*b
 	%				(can be populated automatically if A is a matrix; must be provided as input if A is a function handle)
+	%       options.checkconv       number of iterations after which we check for convergence (default 1).
 	%
 	% Output:
 	%	y			final approximate solution
@@ -34,6 +35,11 @@ function [y, iter, errhist] = lanczos_fAb(A, b, theta, f, tol, options)
 	if nargout == 3
 		errhist = [];
 	end
+	if isfield (options, 'checkconv') == 0
+		options.checkconv = 1;
+	end
+
+
 
 	% preprocessing: factorizations for solving linear systems
 	decomp = cell(1, k);
@@ -47,9 +53,9 @@ function [y, iter, errhist] = lanczos_fAb(A, b, theta, f, tol, options)
 					break;
 				end
 			end
-			if ~check 
+			if ~check
 				if theta(i) == inf
-						options.solveSystems{i} = @(v) v;
+					options.solveSystems{i} = @(v) v;
 				else
 					if isa(A, 'function_handle')
 						error("options.solveSystems must be given as input if A is a function handle");
@@ -80,9 +86,9 @@ function [y, iter, errhist] = lanczos_fAb(A, b, theta, f, tol, options)
 
 	for j = 1:k
 		if j == 1
-			nrmb = norm(b);	
+			nrmb = norm(b);
 			W(:, 1) = b/nrmb;
-			[W(:, 2), alpha(1), beta(1)] = short_recurrence_Arnoldi_in(mult, options.solveSystems{1}, zeros(n,1), W(:,1), theta(1), inf, inf, 0);		
+			[W(:, 2), alpha(1), beta(1)] = short_recurrence_Arnoldi_in(mult, options.solveSystems{1}, zeros(n,1), W(:,1), theta(1), inf, inf, 0);
 		elseif j == 2
 			[W(:, 3), alpha(2), beta(2)] = short_recurrence_Arnoldi_in(mult, options.solveSystems{2}, W(:,1), W(:,2), theta(2), inf, theta(1), beta(1));
 		else
@@ -93,24 +99,32 @@ function [y, iter, errhist] = lanczos_fAb(A, b, theta, f, tol, options)
 		else
 			invpoles(j+1) = 1/theta(j);
 		end
+
 		% Compute solution and check convergence if last pole is infinity:
-		if theta(j) == inf
-			H = diag(alpha(1:j)) + diag(beta(1:j-1),-1) + diag(beta(1:j-1),-1)';
-			K = eye(j) + diag(invpoles(1:j)) * H;
-			T = H/K + mu*eye(j);
-			yhat = f(T)*[nrmb; zeros(j-1, 1)];
-			% Check convergence:
-			errest = norm(yhat - [yhat_old; zeros(j - j_old, 1)]);
-			if nargout == 3
-				errhist(end+1, :) = [j, errest];
-			end
-			if errest < tol*norm(yhat)
-				y = W(:, 1:j)*yhat;
-				iter = j;
-				return;
-			else
-				yhat_old = yhat;
-				j_old = j;
+		if mod(j,options.checkconv)==0
+			if theta(j) == inf
+				H = diag(alpha(1:j)) + diag(beta(1:j-1),-1) + diag(beta(1:j-1),-1)';
+				K = eye(j) + diag(invpoles(1:j)) * H;
+				T = H/K + mu*eye(j);
+				yhat = f(T)*[nrmb; zeros(j-1, 1)];
+				if options.checkconv > 1
+					yhat_old = f(T(1:end-1,1:end-1))*[nrmb; zeros(j-2, 1)];
+					j_old = j-1;
+				end
+
+				% Check convergence:
+				errest = norm(yhat - [yhat_old; zeros(j - j_old, 1)]);
+				if nargout == 3
+					errhist(end+1, :) = [j, errest];
+				end
+				if errest < tol*norm(yhat)
+					y = W(:, 1:j)*yhat;
+					iter = j;
+					return;
+				else
+					yhat_old = yhat;
+					j_old = j;
+				end
 			end
 		end
 	end
@@ -125,4 +139,4 @@ function [y, iter, errhist] = lanczos_fAb(A, b, theta, f, tol, options)
 		end
 	end
 
-end 
+end
